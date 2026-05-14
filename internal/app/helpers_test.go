@@ -103,6 +103,15 @@ func TestRelativePath_DifferentVolumeFallsBackToInput(t *testing.T) {
 	}
 }
 
+func TestRelativePath_FallbackOnError(t *testing.T) {
+	// filepath.Rel errors when base is absolute but target is a relative path
+	// containing "..". We expect the function to return the original target.
+	got := relativePath("/abs", "../somewhere")
+	if got != "../somewhere" {
+		t.Fatalf("got %q, want fallback to original input", got)
+	}
+}
+
 func TestCanPrompt_NoInteractive(t *testing.T) {
 	r := &runner{opts: &Options{NoInteractive: true}, io: IO{Stdin: stringReaderEmpty{}}}
 	if r.canPrompt() {
