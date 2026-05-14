@@ -1,6 +1,7 @@
 # Build outputs
 /patchrun
 /patchrun.exe
+/bin/
 /dist/
 
 # Test outputs
