@@ -95,6 +95,17 @@ func TestRun_StdinPiped(t *testing.T) {
 	}
 }
 
+func TestIsNotFoundLike(t *testing.T) {
+	if isNotFoundLike(nil) {
+		t.Fatalf("nil is not not-found")
+	}
+	// exec.Error wrapping exec.ErrNotFound.
+	err := &exec.Error{Name: "no-such-cmd", Err: exec.ErrNotFound}
+	if !isNotFoundLike(err) {
+		t.Fatalf("exec.Error{ErrNotFound} should match")
+	}
+}
+
 func TestRun_ContextCancel(t *testing.T) {
 	skipIfNoSh(t)
 	ctx, cancel := context.WithCancel(context.Background())

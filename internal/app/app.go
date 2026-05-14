@@ -101,6 +101,10 @@ func Run(parentCtx context.Context, argv []string, io IO, version string) int {
 		}
 	}
 
+	if exit, handled := runUtilitySubcommand(opts, io); handled {
+		return exit
+	}
+
 	ctx, cancel := context.WithCancel(parentCtx)
 	defer cancel()
 
@@ -115,11 +119,19 @@ func Run(parentCtx context.Context, argv []string, io IO, version string) int {
 		}
 	}()
 
+	colorMode := textui.ColorAuto
+	switch opts.Color {
+	case "always":
+		colorMode = textui.ColorAlways
+	case "never":
+		colorMode = textui.ColorNever
+	}
+
 	rr := &runner{opts: opts, io: io, version: version}
-	rr.colorOut = textui.NewColorizer(textui.ColorAuto, io.Stdout)
-	rr.colorErr = textui.NewColorizer(textui.ColorAuto, io.Stderr)
+	rr.colorOut = textui.NewColorizer(colorMode, io.Stdout)
+	rr.colorErr = textui.NewColorizer(colorMode, io.Stderr)
 	if opts.JSON {
-		// Disable color on stdout for clean JSON.
+		// Always strip color on stdout in JSON mode regardless of --color.
 		rr.colorOut = textui.NewColorizer(textui.ColorNever, io.Stdout)
 	}
 	return rr.execute(ctx)
@@ -158,6 +170,32 @@ type runner struct {
 	applied           bool
 }
 
+// writeSidecar writes a .meta.json next to the saved patch unless --no-sidecar.
+func (r *runner) writeSidecar(patchPath string) {
+	if r.opts.NoSidecar {
+		return
+	}
+	meta := SidecarMetadata{
+		Version:      r.version,
+		Repo:         r.originalRoot,
+		HeadSHA:      r.originalHead,
+		Branch:       r.branch,
+		Dirty:        r.originalDirty,
+		BaselineRef:  r.baselineRef,
+		Command:      r.opts.Command,
+		ExitCode:     r.cmdResult.ExitCode,
+		DurationMs:   r.cmdResult.Duration.Milliseconds(),
+		TimedOut:     r.cmdResult.TimedOut,
+		GeneratedAt:  time.Now().UTC().Format(time.RFC3339),
+		FilesChanged: r.totals.Files,
+		Insertions:   r.totals.Insertions,
+		Deletions:    r.totals.Deletions,
+	}
+	if err := WriteSidecar(patchPath, meta, r.io.Stderr); err != nil {
+		r.verboseLog("sidecar write failed: %v", err)
+	}
+}
+
 func (r *runner) logHuman(format string, args ...interface{}) {
 	if r.opts.Quiet {
 		return
@@ -191,6 +229,18 @@ func (r *runner) run(ctx context.Context) int {
 		fmt.Fprintf(r.io.Stderr, "error: getwd: %v\n", err)
 		return ExitGeneralFailure
 	}
+	if r.opts.Cwd != "" {
+		abs, err := filepath.Abs(r.opts.Cwd)
+		if err != nil {
+			fmt.Fprintf(r.io.Stderr, "error: --cwd: %v\n", err)
+			return ExitGeneralFailure
+		}
+		if info, err := os.Stat(abs); err != nil || !info.IsDir() {
+			fmt.Fprintf(r.io.Stderr, "error: --cwd %q is not a directory\n", abs)
+			return ExitGeneralFailure
+		}
+		cwd = abs
+	}
 	r.originalCwd = cwd
 
 	// 2. Sanity-check git.
@@ -212,7 +262,7 @@ func (r *runner) run(ctx context.Context) int {
 	}
 	r.relCwd = rel
 
-	r.repoGit, err = gitx.New(root)
+	r.repoGit, err = gitx.NewWithBin(root, r.opts.GitBin)
 	if err != nil {
 		fmt.Fprintf(r.io.Stderr, "error: %v\n", err)
 		return ExitGitMissing
@@ -224,7 +274,7 @@ func (r *runner) run(ctx context.Context) int {
 	head, err := r.repoGit.HeadSHA(ctx)
 	if err != nil {
 		if errors.Is(err, gitx.ErrUnbornHead) {
-			fmt.Fprintln(r.io.Stderr, "error: patchrun requires at least one commit for now.")
+			fmt.Fprintln(r.io.Stderr, "error: patchrun requires at least one commit. Try: git commit --allow-empty -m 'init'")
 			return ExitGeneralFailure
 		}
 		fmt.Fprintf(r.io.Stderr, "error: resolve HEAD: %v\n", err)
@@ -414,7 +464,7 @@ func (r *runner) setupTempWorktree(ctx context.Context) error {
 		return fmt.Errorf("git worktree add: %w", err)
 	}
 
-	g, err := gitx.New(r.tempWorktree)
+	g, err := gitx.NewWithBin(r.tempWorktree, r.opts.GitBin)
 	if err != nil {
 		return err
 	}
@@ -622,6 +672,7 @@ func (r *runner) dispatchNonInteractive(ctx context.Context) int {
 			return ExitGeneralFailure
 		}
 		r.savedPath = savedPath
+		r.writeSidecar(savedPath)
 		r.logHuman("saved patch: %s", savedPath)
 	}
 
@@ -646,6 +697,7 @@ func (r *runner) dispatchNonInteractive(ctx context.Context) int {
 			return ExitGeneralFailure
 		}
 		r.savedPath = defaultPath
+		r.writeSidecar(defaultPath)
 		r.logHuman("saved patch: %s", relativePath(r.originalRoot, defaultPath))
 	}
 	if r.opts.JSON && r.savedPath == "" {
@@ -656,6 +708,7 @@ func (r *runner) dispatchNonInteractive(ctx context.Context) int {
 			return ExitGeneralFailure
 		}
 		r.savedPath = defaultPath
+		r.writeSidecar(defaultPath)
 	}
 
 	if r.opts.ShowDiff {
@@ -694,6 +747,7 @@ func (r *runner) dispatchInteractive(ctx context.Context) int {
 				return ExitGeneralFailure
 			}
 			r.savedPath = abs
+			r.writeSidecar(abs)
 			fmt.Fprintf(r.io.Stderr, "saved: %s\n", abs)
 		case ActionView:
 			if len(r.patchBytes) > 100*1024*1024 {
@@ -743,6 +797,7 @@ func (r *runner) applyToOriginal(ctx context.Context) int {
 			path = defaultSavePath(r.originalRoot)
 			if err := gitx.SavePatchAtomic(path, r.patchBytes); err == nil {
 				r.savedPath = path
+				r.writeSidecar(path)
 			}
 		}
 		fmt.Fprintf(r.io.Stderr,
@@ -765,6 +820,7 @@ func (r *runner) applyToOriginal(ctx context.Context) int {
 			autoPath := defaultSavePath(r.originalRoot)
 			if serr := gitx.SavePatchAtomic(autoPath, r.patchBytes); serr == nil {
 				r.savedPath = autoPath
+				r.writeSidecar(autoPath)
 			}
 		}
 		if r.opts.Apply3Way {

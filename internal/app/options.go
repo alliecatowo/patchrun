@@ -51,7 +51,30 @@ type Options struct {
 	VersionRequested bool
 	HelpRequested    bool
 
-	// Command is the user command after `--`.
+	// Color controls ANSI output. "auto" (default), "always", or "never".
+	Color string
+
+	// CompletionShell, if non-empty, asks patchrun to print a shell completion
+	// script to stdout and exit. One of "bash", "zsh", "fish".
+	CompletionShell string
+
+	// GitBin lets users override the git executable path.
+	GitBin string
+
+	// Cwd lets users point patchrun at a different repo without `cd`.
+	Cwd string
+
+	// ListRuns prints kept worktrees in --worktree-dir and exits.
+	ListRuns bool
+
+	// Prune removes patchrun worktrees in --worktree-dir and exits.
+	Prune bool
+
+	// NoSidecar disables the .meta.json sidecar next to saved patches.
+	NoSidecar bool
+
+	// Command is the user command after `--`. May be empty for utility
+	// subcommands like --completion or --list-runs.
 	Command []string
 }
 
@@ -105,6 +128,13 @@ func ParseOptions(argv []string, helpWriter io.Writer, version string) (*Options
 	fs.BoolVar(&opts.Quiet, "quiet", false, "Less output")
 	fs.BoolVar(&opts.Verbose, "verbose", false, "More output")
 	fs.BoolVar(&opts.VersionRequested, "version", false, "Print version")
+	fs.StringVar(&opts.Color, "color", "auto", "Color output: auto|always|never")
+	fs.StringVar(&opts.CompletionShell, "completion", "", "Print shell completion script and exit: bash|zsh|fish")
+	fs.StringVar(&opts.GitBin, "git-bin", "", "Override path to the git executable")
+	fs.StringVar(&opts.Cwd, "cwd", "", "Run as if patchrun were invoked from <path>")
+	fs.BoolVar(&opts.ListRuns, "list-runs", false, "List kept worktrees under --worktree-dir and exit")
+	fs.BoolVar(&opts.Prune, "prune", false, "Remove patchrun worktrees under --worktree-dir and exit")
+	fs.BoolVar(&opts.NoSidecar, "no-sidecar", false, "Do not write a .meta.json next to saved patches")
 	help := fs.BoolP("help", "h", false, "Show help")
 
 	fs.Usage = func() {
@@ -145,6 +175,18 @@ func ParseOptions(argv []string, helpWriter io.Writer, version string) (*Options
 	if opts.Interactive && opts.NoInteractive {
 		return nil, &UsageError{Msg: "--interactive and --no-interactive are mutually exclusive"}
 	}
+	switch opts.Color {
+	case "auto", "always", "never":
+	default:
+		return nil, &UsageError{Msg: fmt.Sprintf("invalid --color value %q: want auto|always|never", opts.Color)}
+	}
+	if opts.CompletionShell != "" {
+		switch opts.CompletionShell {
+		case "bash", "zsh", "fish":
+		default:
+			return nil, &UsageError{Msg: fmt.Sprintf("invalid --completion value %q: want bash|zsh|fish", opts.CompletionShell)}
+		}
+	}
 
 	// Any leftover positional args before `--` are not allowed.
 	if leftover := fs.Args(); len(leftover) > 0 {
@@ -153,7 +195,9 @@ func ParseOptions(argv []string, helpWriter io.Writer, version string) (*Options
 		}
 	}
 
-	if len(commandArgs) == 0 {
+	// Utility subcommands don't require a command after `--`.
+	utility := opts.CompletionShell != "" || opts.ListRuns || opts.Prune
+	if len(commandArgs) == 0 && !utility {
 		return nil, &UsageError{Msg: "missing command: use 'patchrun [options] -- <command> [args...]'"}
 	}
 	opts.Command = commandArgs
@@ -206,6 +250,13 @@ Options:
   --interactive                 Force interactive menu
   --no-interactive              Disable prompts
   --command-timeout <duration>  Kill command after duration (e.g. 30s, 5m)
+  --color <mode>                Color output: auto|always|never
+  --no-sidecar                  Skip the .meta.json sidecar next to saved patches
+  --git-bin <path>              Override git binary
+  --cwd <path>                  Run as if invoked from <path>
+  --list-runs                   List kept worktrees under --worktree-dir
+  --prune                       Remove patchrun worktrees under --worktree-dir
+  --completion <shell>          Print shell completion (bash|zsh|fish)
   --quiet                       Less output
   --verbose                     More output
   --version                     Print version

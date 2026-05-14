@@ -119,6 +119,13 @@ Don't use `patchrun` for untrusted code. Use a container or VM for that.
 | `--stat` / `--no-stat` | Show or hide diffstat (default: show) |
 | `--interactive` / `--no-interactive` | Force or disable the prompt |
 | `--command-timeout <duration>` | Kill the command after duration (`30s`, `5m`, `1h`) |
+| `--color <mode>` | `auto` (default), `always`, or `never` |
+| `--no-sidecar` | Skip the `.meta.json` file written next to saved patches |
+| `--git-bin <path>` | Override the `git` executable |
+| `--cwd <path>` | Run as if invoked from `<path>` instead of the shell's `cwd` |
+| `--list-runs` | List kept worktrees under `--worktree-dir` and exit |
+| `--prune` | Remove every `patchrun-*` directory under `--worktree-dir` and exit |
+| `--completion <shell>` | Print a `bash`/`zsh`/`fish` completion script and exit |
 | `--quiet` / `--verbose` | Less or more logging |
 | `--version` | Print version |
 | `-h`, `--help` | Show help |
@@ -220,16 +227,15 @@ typical patch looks like before installing.
 
 ## Shell completions
 
-Static completion scripts for bash, zsh, and fish live in [`completions/`](completions/).
+`patchrun` can print completion scripts to stdout:
 
 ```bash
-# bash
-sudo cp completions/patchrun.bash /etc/bash_completion.d/patchrun
-# zsh
-cp completions/patchrun.zsh "${fpath[1]}/_patchrun"
-# fish
-cp completions/patchrun.fish ~/.config/fish/completions/patchrun.fish
+patchrun --completion bash | sudo tee /etc/bash_completion.d/patchrun
+patchrun --completion zsh  > "${fpath[1]}/_patchrun"
+patchrun --completion fish > ~/.config/fish/completions/patchrun.fish
 ```
+
+Static copies of the same scripts also live in [`completions/`](completions/).
 
 After the `--` separator, completion is delegated to whatever command you're
 about to run, so `patchrun -- git <tab>` completes git subcommands.

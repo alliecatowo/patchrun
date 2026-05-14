@@ -27,9 +27,23 @@ type Git struct {
 
 // New resolves the git binary on PATH. Returns ErrGitMissing if not found.
 func New(workDir string) (*Git, error) {
-	bin, err := exec.LookPath("git")
-	if err != nil {
-		return nil, ErrGitMissing
+	return NewWithBin(workDir, "")
+}
+
+// NewWithBin uses the provided git binary path if non-empty, otherwise resolves
+// `git` on PATH.
+func NewWithBin(workDir, bin string) (*Git, error) {
+	if bin == "" {
+		resolved, err := exec.LookPath("git")
+		if err != nil {
+			return nil, ErrGitMissing
+		}
+		bin = resolved
+	} else {
+		// Validate that the override exists and is executable.
+		if _, err := exec.LookPath(bin); err != nil {
+			return nil, ErrGitMissing
+		}
 	}
 	return &Git{Bin: bin, WorkDir: workDir}, nil
 }
