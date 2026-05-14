@@ -1,0 +1,15 @@
+# Build outputs
+/patchrun
+/patchrun.exe
+/dist/
+
+# Test outputs
+/.patchrun/
+coverage.out
+coverage.html
+
+# Editor
+.idea/
+.vscode/
+*.swp
+.DS_Store
