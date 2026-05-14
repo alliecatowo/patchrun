@@ -1,6 +1,7 @@
 package textui
 
 import (
+	"bytes"
 	"reflect"
 	"strings"
 	"testing"
@@ -87,5 +88,44 @@ func TestFormatSummary_Pluralization(t *testing.T) {
 	}
 	if !strings.Contains(s2, "(1 binary)") {
 		t.Fatalf("expected binary count, got: %s", s2)
+	}
+}
+
+func TestWriteSummary_Empty(t *testing.T) {
+	var buf bytes.Buffer
+	c := NewColorizer(ColorNever, &buf)
+	WriteSummary(&buf, c, nil, Totals{}, true)
+	if !strings.Contains(buf.String(), "No repo changes") {
+		t.Fatalf("expected 'No repo changes' message, got: %s", buf.String())
+	}
+}
+
+func TestWriteSummary_WithEntries(t *testing.T) {
+	var buf bytes.Buffer
+	c := NewColorizer(ColorNever, &buf)
+	entries := []NameStatusEntry{
+		{Status: "A", Path: "new.txt"},
+		{Status: "M", Path: "mod.txt"},
+		{Status: "D", Path: "gone.txt"},
+		{Status: "R", OldPath: "old.txt", Path: "renamed.txt"},
+	}
+	totals := Totals{Files: 4, Insertions: 7, Deletions: 3}
+	WriteSummary(&buf, c, entries, totals, true)
+	out := buf.String()
+	for _, want := range []string{"Changed 4 files", "new.txt", "mod.txt", "gone.txt", "old.txt -> renamed.txt", "7 insertions", "3 deletions"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in:\n%s", want, out)
+		}
+	}
+}
+
+func TestSum(t *testing.T) {
+	got := Sum([]NumstatEntry{
+		{Insertions: 3, Deletions: 1, Path: "a"},
+		{Insertions: 2, Deletions: 0, Path: "b"},
+		{Binary: true, Path: "c"},
+	})
+	if got.Files != 3 || got.Insertions != 5 || got.Deletions != 1 || got.Binary != 1 {
+		t.Fatalf("totals: %#v", got)
 	}
 }

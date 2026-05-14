@@ -1,0 +1,41 @@
+diff --git a/src/index.ts b/src/index.ts
+index 5a3f1e9..b27a4d2 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -1,8 +1,8 @@
+-import { Server } from "./server"
+-import {Config} from './config';
++import { Server } from "./server";
++import { Config } from "./config";
+
+-export async function main(){
+-    const cfg = await Config.load()
+-    const srv = new Server(cfg)
+-    await srv.start()
++export async function main() {
++  const cfg = await Config.load();
++  const srv = new Server(cfg);
++  await srv.start();
+ }
+diff --git a/src/server.ts b/src/server.ts
+index a1c4f88..8e2b011 100644
+--- a/src/server.ts
++++ b/src/server.ts
+@@ -1,11 +1,11 @@
+-import http from "node:http"
++import http from "node:http";
+
+ export class Server {
+-    constructor(private cfg:any){}
++  constructor(private cfg: any) {}
+
+-    async start(){
+-        http.createServer((_,res)=>res.end("ok"))
+-            .listen(this.cfg.port)
+-    }
++  async start() {
++    http
++      .createServer((_, res) => res.end("ok"))
++      .listen(this.cfg.port);
++  }
+ }

@@ -1,0 +1,70 @@
+diff --git a/api/handlers.py b/api/handlers.py
+index 8f0d4e1..3c6a9b2 100644
+--- a/api/handlers.py
++++ b/api/handlers.py
+@@ -1,17 +1,17 @@
+-from .services import UserSvc
++from .services import UserService
+
+
+ class UserHandler:
+-    def __init__(self, svc: UserSvc):
++    def __init__(self, svc: UserService):
+         self.svc = svc
+
+     async def get(self, request):
+         user_id = request.match_info["user_id"]
+-        user = await self.svc.fetch(user_id)
++        user = await self.svc.fetch_one(user_id)
+         return {"user": user}
+
+     async def list(self, request):
+-        users = await self.svc.fetch_all()
++        users = await self.svc.fetch_all(limit=request.query.get("limit"))
+         return {"users": users}
+diff --git a/api/services.py b/api/services.py
+index 1a2b3c4..5d6e7f8 100644
+--- a/api/services.py
++++ b/api/services.py
+@@ -1,15 +1,18 @@
+ from typing import Optional
+
+-class UserSvc:
++class UserService:
+     def __init__(self, db):
+         self.db = db
+
+-    async def fetch(self, user_id: str) -> Optional[dict]:
++    async def fetch_one(self, user_id: str) -> Optional[dict]:
+         row = await self.db.fetchrow("SELECT * FROM users WHERE id = $1", user_id)
+         return dict(row) if row else None
+
+-    async def fetch_all(self) -> list[dict]:
+-        rows = await self.db.fetch("SELECT * FROM users")
++    async def fetch_all(self, limit: Optional[int] = None) -> list[dict]:
++        if limit is not None:
++            rows = await self.db.fetch("SELECT * FROM users LIMIT $1", int(limit))
++        else:
++            rows = await self.db.fetch("SELECT * FROM users")
+         return [dict(r) for r in rows]
+diff --git a/tests/test_handlers.py b/tests/test_handlers.py
+index 7b8c9d0..a1b2c3d 100644
+--- a/tests/test_handlers.py
++++ b/tests/test_handlers.py
+@@ -1,12 +1,12 @@
+ import pytest
+-from api.services import UserSvc
++from api.services import UserService
+ from api.handlers import UserHandler
+
+
+ async def test_get(db):
+-    svc = UserSvc(db)
++    svc = UserService(db)
+     h = UserHandler(svc)
+     result = await h.get(_mkreq({"user_id": "1"}))
+     assert result["user"]["id"] == "1"
+
+
+-def _mkreq(match): return type("r", (), {"match_info": match})
++def _mkreq(match, query=None): return type("r", (), {"match_info": match, "query": query or {}})

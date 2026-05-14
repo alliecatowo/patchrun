@@ -314,6 +314,20 @@ func TestJSON_TimedOut(t *testing.T) {
 	}
 }
 
+func TestDiff_Flag_PrintsPatchToStderr(t *testing.T) {
+	skipNoSh(t)
+	f := newFixture(t)
+	f.initialCommit()
+	args := append([]string{"--no-interactive", "--diff", "--save", filepath.Join(t.TempDir(), "out.patch"), "--"}, shellArgs("echo data > shown.txt")...)
+	exit, _, stderr := f.runApp(t, args...)
+	if exit != app.ExitOK {
+		t.Fatalf("exit=%d stderr=%s", exit, stderr)
+	}
+	if !strings.Contains(stderr, "diff --git a/shown.txt b/shown.txt") {
+		t.Fatalf("--diff should print patch to stderr:\n%s", stderr)
+	}
+}
+
 func TestDefaultSavePath_WhenNoActionFlag(t *testing.T) {
 	skipNoSh(t)
 	f := newFixture(t)

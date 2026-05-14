@@ -212,6 +212,12 @@ alias pr='patchrun --'
 # Now: pr npm install
 ```
 
+## Example patches
+
+Real `patchrun` output for common commands lives in [`examples/`](examples/):
+formatter runs, generator runs, and codemods. Browse them to see what a
+typical patch looks like before installing.
+
 ## Shell completions
 
 Static completion scripts for bash, zsh, and fish live in [`completions/`](completions/).
