@@ -350,7 +350,7 @@ func TestGit_ApplyAndDiffBinary(t *testing.T) {
 	if err := g2.ApplyCheck(context.Background(), tmp); err != nil {
 		t.Fatalf("check: %v", err)
 	}
-	if err := g2.Apply(context.Background(), tmp, false); err != nil {
+	if err := g2.Apply(context.Background(), tmp, ApplyOptions{}); err != nil {
 		t.Fatalf("apply: %v", err)
 	}
 	got, _ := os.ReadFile(filepath.Join(dst, "a.txt"))

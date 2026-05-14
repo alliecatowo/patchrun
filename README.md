@@ -119,6 +119,11 @@ Don't use `patchrun` for untrusted code. Use a container or VM for that.
 | `--stat` / `--no-stat` | Show or hide diffstat (default: show) |
 | `--interactive` / `--no-interactive` | Force or disable the prompt |
 | `--command-timeout <duration>` | Kill the command after duration (`30s`, `5m`, `1h`) |
+| `--reverse` | Print/save/apply the reverse of the captured patch |
+| `--check` | Verify the patch applies cleanly; do not modify the working tree |
+| `--exec <cmd>` | Run additional command in the worktree (repeatable) |
+| `--snapshot <dir>` | Dump the post-run worktree (minus `.git`) into `<dir>` |
+| `--ignore-whitespace` | Pass `--ignore-whitespace` to `git apply` |
 | `--color <mode>` | `auto` (default), `always`, or `never` |
 | `--no-sidecar` | Skip the `.meta.json` file written next to saved patches |
 | `--git-bin <path>` | Override the `git` executable |

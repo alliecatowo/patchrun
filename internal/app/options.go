@@ -73,6 +73,25 @@ type Options struct {
 	// NoSidecar disables the .meta.json sidecar next to saved patches.
 	NoSidecar bool
 
+	// Reverse, when true, prints/saves the reverse of the captured patch
+	// (so applying it would undo the command's effect).
+	Reverse bool
+
+	// Snapshot is a path to dump the entire post-run temp worktree into.
+	Snapshot string
+
+	// Execs are additional commands to run inside the temp worktree after
+	// the main command. Failures still produce a patch but exit non-zero.
+	Execs []string
+
+	// CheckOnly stops after verifying the patch applies cleanly to the
+	// original repo. Saves the patch (or stdouts/JSONs it) but does not
+	// modify the working tree even when combined with --apply.
+	CheckOnly bool
+
+	// IgnoreWhitespace passes --ignore-whitespace to git apply.
+	IgnoreWhitespace bool
+
 	// Command is the user command after `--`. May be empty for utility
 	// subcommands like --completion or --list-runs.
 	Command []string
@@ -135,6 +154,11 @@ func ParseOptions(argv []string, helpWriter io.Writer, version string) (*Options
 	fs.BoolVar(&opts.ListRuns, "list-runs", false, "List kept worktrees under --worktree-dir and exit")
 	fs.BoolVar(&opts.Prune, "prune", false, "Remove patchrun worktrees under --worktree-dir and exit")
 	fs.BoolVar(&opts.NoSidecar, "no-sidecar", false, "Do not write a .meta.json next to saved patches")
+	fs.BoolVar(&opts.Reverse, "reverse", false, "Print/save the reverse of the captured patch")
+	fs.StringVar(&opts.Snapshot, "snapshot", "", "Dump the post-run temp worktree to this directory")
+	fs.StringSliceVar(&opts.Execs, "exec", nil, "Additional command to run in the worktree, repeatable")
+	fs.BoolVar(&opts.CheckOnly, "check", false, "Verify the patch applies cleanly; do not apply")
+	fs.BoolVar(&opts.IgnoreWhitespace, "ignore-whitespace", false, "Pass --ignore-whitespace to git apply")
 	help := fs.BoolP("help", "h", false, "Show help")
 
 	fs.Usage = func() {
@@ -252,6 +276,11 @@ Options:
   --command-timeout <duration>  Kill command after duration (e.g. 30s, 5m)
   --color <mode>                Color output: auto|always|never
   --no-sidecar                  Skip the .meta.json sidecar next to saved patches
+  --reverse                     Print/save the reverse of the captured patch
+  --snapshot <dir>              Dump the post-run worktree into <dir>
+  --exec <command>              Additional command to run in worktree (repeatable)
+  --check                       Verify patch applies; do not modify the working tree
+  --ignore-whitespace           Pass --ignore-whitespace to git apply
   --git-bin <path>              Override git binary
   --cwd <path>                  Run as if invoked from <path>
   --list-runs                   List kept worktrees under --worktree-dir

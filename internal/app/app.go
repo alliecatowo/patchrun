@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"math/rand"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -373,6 +375,25 @@ func (r *runner) run(ctx context.Context) int {
 		r.logHuman("%s command timed out", r.colorErr.Red("warning:"))
 	}
 
+	// 10b. Run any --exec follow-ups in the same temp worktree. Their output
+	// is streamed to stderr; failures are surfaced but do not block the patch.
+	if len(r.opts.Execs) > 0 && !r.cmdResult.TimedOut {
+		if execExit := r.runExecCommands(ctx); execExit != 0 && r.cmdResult.ExitCode == 0 {
+			// Promote the failure into the child exit code so the rest of the
+			// pipeline reports the right status.
+			r.cmdResult.ExitCode = execExit
+		}
+	}
+
+	// 10c. Optional snapshot of the temp worktree.
+	if r.opts.Snapshot != "" {
+		if err := r.writeSnapshot(); err != nil {
+			fmt.Fprintf(r.io.Stderr, "warning: snapshot failed: %v\n", err)
+		} else {
+			r.logHuman("snapshot: %s", r.opts.Snapshot)
+		}
+	}
+
 	// 11. Capture patch.
 	patch, err := r.capturePatch(ctx)
 	if err != nil {
@@ -579,6 +600,96 @@ func (r *runner) runChildCommand(ctx context.Context) run.Result {
 	})
 }
 
+// runExecCommands runs each --exec command in the temp worktree. Returns the
+// first non-zero exit code seen, or 0 if everything passed.
+func (r *runner) runExecCommands(ctx context.Context) int {
+	tempCwd := r.tempWorktree
+	if r.relCwd != "." {
+		tempCwd = filepath.Join(r.tempWorktree, filepath.FromSlash(r.relCwd))
+	}
+	env := os.Environ()
+	env = append(env,
+		"PATCHRUN=1",
+		"PATCHRUN_WORKTREE="+r.tempWorktree,
+		"PATCHRUN_ORIGINAL_ROOT="+r.originalRoot,
+		"PATCHRUN_BASE="+r.baselineRef,
+		"PATCHRUN_RUN_ID="+r.runID,
+	)
+	firstFail := 0
+	for _, script := range r.opts.Execs {
+		r.logHuman("\nexec: %s", script)
+		shArgs := []string{"sh", "-c", script}
+		if runtime.GOOS == "windows" {
+			shArgs = []string{"cmd.exe", "/c", script}
+		}
+		res := run.Run(ctx, run.Spec{
+			Args:    shArgs,
+			Dir:     tempCwd,
+			Env:     env,
+			Stdout:  r.io.Stderr,
+			Stderr:  r.io.Stderr,
+			Timeout: r.opts.CommandTimeout,
+		})
+		r.logHuman("exec exited: %d (%s)", res.ExitCode, res.Duration.Round(time.Millisecond))
+		if res.ExitCode != 0 && firstFail == 0 {
+			firstFail = res.ExitCode
+		}
+	}
+	return firstFail
+}
+
+// writeSnapshot copies the post-run temp worktree into r.opts.Snapshot.
+// Excludes the worktree's .git pointer because that references the original
+// repo's gitdir and isn't useful in a portable snapshot.
+func (r *runner) writeSnapshot() error {
+	dst, err := filepath.Abs(r.opts.Snapshot)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dst, 0o755); err != nil {
+		return err
+	}
+	return filepath.WalkDir(r.tempWorktree, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, relErr := filepath.Rel(r.tempWorktree, path)
+		if relErr != nil {
+			return relErr
+		}
+		if rel == "." {
+			return nil
+		}
+		if rel == ".git" || strings.HasPrefix(rel, ".git"+string(filepath.Separator)) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		target := filepath.Join(dst, rel)
+		info, infoErr := d.Info()
+		if infoErr != nil {
+			return infoErr
+		}
+		switch {
+		case info.Mode()&os.ModeSymlink != 0:
+			link, lerr := os.Readlink(path)
+			if lerr != nil {
+				return lerr
+			}
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return err
+			}
+			_ = os.Remove(target)
+			return os.Symlink(link, target)
+		case d.IsDir():
+			return os.MkdirAll(target, info.Mode().Perm()|0o700)
+		default:
+			return copyx.CopyFilePreserve(path, target)
+		}
+	})
+}
+
 // pathspecs builds the include/exclude pathspec slice for git diff -- args.
 func (r *runner) pathspecs() []string {
 	if len(r.opts.Includes) == 0 && len(r.opts.Excludes) == 0 {
@@ -610,7 +721,7 @@ func (r *runner) capturePatch(ctx context.Context) ([]byte, error) {
 	if _, err := r.tempGit.RunBytes(ctx, addArgs...); err != nil {
 		return nil, fmt.Errorf("stage temp changes: %w", err)
 	}
-	patch, err := r.tempGit.DiffBinaryCached(ctx, r.baselineRef, r.pathspecs())
+	patch, err := r.tempGit.DiffBinaryCachedOpt(ctx, r.baselineRef, r.pathspecs(), r.opts.Reverse)
 	if err != nil {
 		return nil, fmt.Errorf("diff cached: %w", err)
 	}
@@ -814,7 +925,9 @@ func (r *runner) applyToOriginal(ctx context.Context) int {
 	}
 	defer os.Remove(patchPath)
 
-	if err := r.repoGit.ApplyCheck(ctx, patchPath); err != nil {
+	applyOpt := gitx.ApplyOptions{Reverse: r.opts.Reverse, IgnoreWhitespace: r.opts.IgnoreWhitespace}
+
+	if err := r.repoGit.ApplyCheckOpt(ctx, patchPath, applyOpt); err != nil {
 		// Save patch automatically if not already.
 		if r.savedPath == "" {
 			autoPath := defaultSavePath(r.originalRoot)
@@ -823,8 +936,17 @@ func (r *runner) applyToOriginal(ctx context.Context) int {
 				r.writeSidecar(autoPath)
 			}
 		}
+		if r.opts.CheckOnly {
+			fmt.Fprintf(r.io.Stderr, "%s patch does not apply cleanly (check failed).\n", r.colorErr.Red("error:"))
+			if r.savedPath != "" {
+				fmt.Fprintf(r.io.Stderr, "saved patch: %s\n", relativePath(r.originalRoot, r.savedPath))
+			}
+			return ExitApplyFailed
+		}
 		if r.opts.Apply3Way {
-			if applyErr := r.repoGit.Apply(ctx, patchPath, true); applyErr != nil {
+			tw := applyOpt
+			tw.ThreeWay = true
+			if applyErr := r.repoGit.Apply(ctx, patchPath, tw); applyErr != nil {
 				fmt.Fprintf(r.io.Stderr, "error: 3-way apply failed: %v\n", applyErr)
 				if r.savedPath != "" {
 					fmt.Fprintf(r.io.Stderr, "saved patch: %s\n", relativePath(r.originalRoot, r.savedPath))
@@ -843,12 +965,20 @@ func (r *runner) applyToOriginal(ctx context.Context) int {
 		return ExitApplyFailed
 	}
 
-	if err := r.repoGit.Apply(ctx, patchPath, false); err != nil {
+	if r.opts.CheckOnly {
+		fmt.Fprintln(r.io.Stderr, "patch applies cleanly (check only).")
+		return ExitOK
+	}
+	if err := r.repoGit.Apply(ctx, patchPath, applyOpt); err != nil {
 		fmt.Fprintf(r.io.Stderr, "error: apply: %v\n", err)
 		return ExitApplyFailed
 	}
 	r.applied = true
-	fmt.Fprintln(r.io.Stderr, "applied patch to original repo.")
+	if r.opts.Reverse {
+		fmt.Fprintln(r.io.Stderr, "applied reverse patch to original repo.")
+	} else {
+		fmt.Fprintln(r.io.Stderr, "applied patch to original repo.")
+	}
 	return ExitOK
 }
 

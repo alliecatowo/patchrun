@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `--reverse`: print/save/apply the reverse of the captured patch.
+- `--check`: verify the patch applies cleanly without modifying the working tree (use with `--apply`).
+- `--exec <cmd>` (repeatable): run additional commands in the temp worktree after the main command. Failures surface in the exit code while still preserving the patch.
+- `--snapshot <dir>`: dump the post-run temp worktree (minus `.git`) to a directory. Useful for inspecting what the command produced before applying.
+- `--ignore-whitespace`: pass through to `git apply`.
 - `--color auto|always|never` to control ANSI output explicitly.
 - `--completion bash|zsh|fish` to print a completion script to stdout.
 - `--git-bin <path>` to override the `git` executable.

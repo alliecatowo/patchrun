@@ -15,10 +15,14 @@ func (g *Git) DiffBinary(ctx context.Context, base string) ([]byte, error) {
 	return g.RunBytes(ctx, "diff", "--binary", base)
 }
 
-// DiffBinaryCached returns `git diff --binary --cached <base> -- pathspecs...`
-// which captures everything currently staged in the worktree relative to base.
-func (g *Git) DiffBinaryCached(ctx context.Context, base string, pathspecs []string) ([]byte, error) {
-	args := []string{"diff", "--binary", "--cached", base}
+// DiffBinaryCachedOpt returns `git diff --binary --cached [-R] <base> -- <pathspecs>`.
+// reverse=true swaps - and + so applying the result undoes the captured change.
+func (g *Git) DiffBinaryCachedOpt(ctx context.Context, base string, pathspecs []string, reverse bool) ([]byte, error) {
+	args := []string{"diff", "--binary", "--cached"}
+	if reverse {
+		args = append(args, "-R")
+	}
+	args = append(args, base)
 	if len(pathspecs) > 0 {
 		args = append(args, "--")
 		args = append(args, pathspecs...)
@@ -53,11 +57,38 @@ func (g *Git) ApplyCheck(ctx context.Context, patchPath string) error {
 	return err
 }
 
+// ApplyOptions controls a `git apply` invocation.
+type ApplyOptions struct {
+	ThreeWay         bool
+	Reverse          bool
+	IgnoreWhitespace bool
+}
+
 // Apply runs `git apply` against patchPath.
-func (g *Git) Apply(ctx context.Context, patchPath string, threeWay bool) error {
+func (g *Git) Apply(ctx context.Context, patchPath string, opt ApplyOptions) error {
 	args := []string{"apply", "--binary", "--whitespace=nowarn"}
-	if threeWay {
+	if opt.ThreeWay {
 		args = append(args, "--3way")
+	}
+	if opt.Reverse {
+		args = append(args, "--reverse")
+	}
+	if opt.IgnoreWhitespace {
+		args = append(args, "--ignore-whitespace")
+	}
+	args = append(args, patchPath)
+	_, err := g.RunBytes(ctx, args...)
+	return err
+}
+
+// ApplyCheckOpt runs `git apply --check` with extended options.
+func (g *Git) ApplyCheckOpt(ctx context.Context, patchPath string, opt ApplyOptions) error {
+	args := []string{"apply", "--check", "--binary", "--whitespace=nowarn"}
+	if opt.Reverse {
+		args = append(args, "--reverse")
+	}
+	if opt.IgnoreWhitespace {
+		args = append(args, "--ignore-whitespace")
 	}
 	args = append(args, patchPath)
 	_, err := g.RunBytes(ctx, args...)
