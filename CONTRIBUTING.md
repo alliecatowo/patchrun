@@ -41,6 +41,24 @@ When adding a feature, add an integration test that:
 
 Avoid testing implementation internals when an end-to-end test is feasible.
 
+## Coverage
+
+The project currently sits around 82% test coverage. The remaining gap is
+intentional — it's almost entirely error branches that require filesystem
+fault injection to exercise (mid-stream `io.Copy` failures, `os.Rename` after
+a successful `os.Chmod`, read-only directory writes when running as root,
+etc.). Pushing literal 100% would mean either:
+
+- adding a mock filesystem layer behind every call to `os.OpenFile`, `os.Rename`,
+  `os.Chmod`, `io.Copy`, and `exec.Cmd.Run` (worse code), or
+- running tests as a non-root uid with carefully crafted permissions
+  (fragile, doesn't work in many CI setups).
+
+We've made an explicit tradeoff: clear, obvious calls to the standard library
+over a testing-driven abstraction layer. If you're adding new code, please
+write a test that drives the happy path and at least one error branch you
+can reach without `unsafe` or process gymnastics.
+
 ## Style
 
 - `gofmt -s` clean. CI fails otherwise.

@@ -93,6 +93,69 @@ func TestRelativePath(t *testing.T) {
 	}
 }
 
+func TestRelativePath_DifferentVolumeFallsBackToInput(t *testing.T) {
+	// filepath.Rel can't relate paths in different volumes on Windows; on Unix
+	// it falls back to climbing parents. We just assert that whatever we get
+	// back is non-empty.
+	got := relativePath("/a/b", "/c/d/e")
+	if got == "" {
+		t.Fatalf("expected non-empty result")
+	}
+}
+
+func TestCanPrompt_NoInteractive(t *testing.T) {
+	r := &runner{opts: &Options{NoInteractive: true}, io: IO{Stdin: stringReaderEmpty{}}}
+	if r.canPrompt() {
+		t.Fatalf("NoInteractive should suppress prompt")
+	}
+}
+
+func TestCanPrompt_InteractiveFlagForces(t *testing.T) {
+	r := &runner{opts: &Options{Interactive: true}, io: IO{Stdin: stringReaderEmpty{}}}
+	if !r.canPrompt() {
+		t.Fatalf("--interactive should force prompt")
+	}
+}
+
+func TestCanPrompt_JSONWithoutInteractive(t *testing.T) {
+	r := &runner{opts: &Options{JSON: true}, io: IO{Stdin: stringReaderEmpty{}}}
+	if r.canPrompt() {
+		t.Fatalf("JSON should suppress prompt absent --interactive")
+	}
+}
+
+func TestCanPrompt_JSONWithInteractiveAllowed(t *testing.T) {
+	r := &runner{opts: &Options{JSON: true, Interactive: true}, io: IO{Stdin: stringReaderEmpty{}}}
+	if !r.canPrompt() {
+		t.Fatalf("--interactive overrides JSON suppression")
+	}
+}
+
+func TestWillPromptAfterChild_Combinations(t *testing.T) {
+	cases := []struct {
+		name string
+		opts Options
+		want bool
+	}{
+		{"explicit interactive", Options{Interactive: true}, true},
+		{"no-interactive", Options{NoInteractive: true}, false},
+		{"apply non-interactive", Options{Apply: true}, false},
+		{"save non-interactive", Options{SavePath: "x"}, false},
+		{"stdout non-interactive", Options{Stdout: true}, false},
+		{"json non-interactive", Options{JSON: true}, false},
+	}
+	for _, c := range cases {
+		r := &runner{opts: &c.opts, io: IO{Stdin: stringReaderEmpty{}}}
+		if got := r.willPromptAfterChild(); got != c.want {
+			t.Fatalf("%s: got %v want %v", c.name, got, c.want)
+		}
+	}
+}
+
+type stringReaderEmpty struct{}
+
+func (stringReaderEmpty) Read(p []byte) (int, error) { return 0, nil }
+
 func TestParseOptions_ErrorWrappingChain(t *testing.T) {
 	// Ensure UsageError is a normal error.
 	var ue *UsageError

@@ -12,6 +12,12 @@ import (
 // version is set at build time via -ldflags "-X main.version=...".
 var version = "dev"
 
+// realMain is the os.Exit-free entry point. It exists so tests can drive the
+// CLI without terminating the test process.
+func realMain(args []string, io app.IO) int {
+	return app.Run(context.Background(), args, io, version)
+}
+
 func main() {
-	os.Exit(app.Run(context.Background(), os.Args[1:], app.DefaultIO(), version))
+	os.Exit(realMain(os.Args[1:], app.DefaultIO()))
 }
