@@ -212,9 +212,26 @@ alias pr='patchrun --'
 # Now: pr npm install
 ```
 
+## Shell completions
+
+Static completion scripts for bash, zsh, and fish live in [`completions/`](completions/).
+
+```bash
+# bash
+sudo cp completions/patchrun.bash /etc/bash_completion.d/patchrun
+# zsh
+cp completions/patchrun.zsh "${fpath[1]}/_patchrun"
+# fish
+cp completions/patchrun.fish ~/.config/fish/completions/patchrun.fish
+```
+
+After the `--` separator, completion is delegated to whatever command you're
+about to run, so `patchrun -- git <tab>` completes git subcommands.
+
 ## Contributing
 
-Issues and PRs welcome. Run the tests with `go test ./...`.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Run `make test` to execute the full
+suite locally.
 
 ## License
 

@@ -368,6 +368,22 @@ func (r *runner) run(ctx context.Context) int {
 	return exit
 }
 
+// willPromptAfterChild reports whether the post-run flow will read from
+// r.io.Stdin. If so, the child must not be given that reader, otherwise the
+// child's pipe drain goroutine swallows the menu input.
+func (r *runner) willPromptAfterChild() bool {
+	if r.opts.NoInteractive {
+		return false
+	}
+	if r.opts.Apply || r.opts.SavePath != "" || r.opts.Stdout || r.opts.JSON {
+		return false
+	}
+	if r.opts.Interactive {
+		return true
+	}
+	return StdinIsTTY(r.io.Stdin)
+}
+
 func (r *runner) canPrompt() bool {
 	if r.opts.NoInteractive {
 		return false
@@ -378,7 +394,7 @@ func (r *runner) canPrompt() bool {
 	if r.opts.Interactive {
 		return true
 	}
-	return StdinIsTTY()
+	return StdinIsTTY(r.io.Stdin)
 }
 
 func (r *runner) setupTempWorktree(ctx context.Context) error {
@@ -492,8 +508,13 @@ func (r *runner) runChildCommand(ctx context.Context) run.Result {
 		"PATCHRUN_RUN_ID="+r.runID,
 	)
 
+	// Share stdin with the child only when we know we won't read from it for
+	// the post-run menu. exec.Cmd starts a goroutine that drains the supplied
+	// Reader into the child's pipe even if the child never reads — so if we
+	// pass r.io.Stdin to the child and then try to prompt, the prompter sees
+	// EOF.
 	var stdin io.Reader
-	if StdinIsTTY() && !r.opts.NoInteractive {
+	if !r.willPromptAfterChild() {
 		stdin = r.io.Stdin
 	}
 
@@ -913,4 +934,3 @@ func randSuffix(n int) string {
 	}
 	return string(b)
 }
-

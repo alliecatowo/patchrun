@@ -203,9 +203,5 @@ func splitZ(data []byte) []string {
 	if len(data) == 0 {
 		return nil
 	}
-	s := string(data)
-	if strings.HasSuffix(s, "\x00") {
-		s = s[:len(s)-1]
-	}
-	return strings.Split(s, "\x00")
+	return strings.Split(strings.TrimSuffix(string(data), "\x00"), "\x00")
 }

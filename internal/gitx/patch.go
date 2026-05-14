@@ -46,17 +46,6 @@ func (g *Git) DiffNumstatCached(ctx context.Context, base string, pathspecs []st
 	return g.RunBytes(ctx, args...)
 }
 
-// DiffStatCached returns a human-readable diffstat (`--stat`) string.
-func (g *Git) DiffStatCached(ctx context.Context, base string, pathspecs []string) (string, error) {
-	args := []string{"diff", "--stat", "--cached", base}
-	if len(pathspecs) > 0 {
-		args = append(args, "--")
-		args = append(args, pathspecs...)
-	}
-	out, err := g.RunBytes(ctx, args...)
-	return string(out), err
-}
-
 // ApplyCheck runs `git apply --check` against patchPath. Returns nil if the
 // patch would apply cleanly.
 func (g *Git) ApplyCheck(ctx context.Context, patchPath string) error {
@@ -72,13 +61,6 @@ func (g *Git) Apply(ctx context.Context, patchPath string, threeWay bool) error 
 	}
 	args = append(args, patchPath)
 	_, err := g.RunBytes(ctx, args...)
-	return err
-}
-
-// ApplyToIndex applies a patch and updates the index as well (--index).
-// Used internally for baseline replay where staged state must be preserved.
-func (g *Git) ApplyToIndex(ctx context.Context, patchPath string) error {
-	_, err := g.RunBytes(ctx, "apply", "--binary", "--index", "--whitespace=nowarn", patchPath)
 	return err
 }
 
@@ -106,15 +88,6 @@ func (g *Git) ApplyBytesToIndex(ctx context.Context, patch []byte) error {
 // relative to the worktree root.
 func (g *Git) LsUntracked(ctx context.Context) ([]string, error) {
 	out, err := g.RunBytes(ctx, "ls-files", "--others", "--exclude-standard", "-z")
-	if err != nil {
-		return nil, err
-	}
-	return splitZ(out), nil
-}
-
-// LsIgnored returns paths of ignored files relative to the worktree root.
-func (g *Git) LsIgnored(ctx context.Context) ([]string, error) {
-	out, err := g.RunBytes(ctx, "ls-files", "--others", "--ignored", "--exclude-standard", "-z")
 	if err != nil {
 		return nil, err
 	}
@@ -182,10 +155,7 @@ func splitZ(data []byte) []string {
 	if len(data) == 0 {
 		return nil
 	}
-	s := string(data)
-	if strings.HasSuffix(s, "\x00") {
-		s = s[:len(s)-1]
-	}
+	s := strings.TrimSuffix(string(data), "\x00")
 	if s == "" {
 		return nil
 	}

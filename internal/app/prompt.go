@@ -32,11 +32,17 @@ func NewPrompter(in io.Reader, out io.Writer) *Prompter {
 	return &Prompter{reader: bufio.NewReader(in), out: out}
 }
 
-// ReadLine reads a single trimmed line. Returns "" on EOF.
+// ReadLine reads a single trimmed line. If stdin reaches EOF with no
+// trailing data, returns ("", io.EOF) so callers can treat that as a
+// quit/discard signal. EOF after a partial line returns that line with no
+// error (it's a valid one-shot answer).
 func (p *Prompter) ReadLine() (string, error) {
 	line, err := p.reader.ReadString('\n')
 	line = strings.TrimRight(line, "\r\n")
 	if err == io.EOF {
+		if line == "" {
+			return "", io.EOF
+		}
 		return line, nil
 	}
 	return line, err
@@ -113,9 +119,14 @@ func (p *Prompter) AskPath(defaultPath string) (string, error) {
 	return line, nil
 }
 
-// StdinIsTTY reports whether stdin appears to be an interactive terminal.
-func StdinIsTTY() bool {
-	fi, err := os.Stdin.Stat()
+// StdinIsTTY reports whether the given reader is an interactive terminal.
+// Returns true only if r is an *os.File backed by a character device.
+func StdinIsTTY(r io.Reader) bool {
+	f, ok := r.(*os.File)
+	if !ok || f == nil {
+		return false
+	}
+	fi, err := f.Stat()
 	if err != nil {
 		return false
 	}

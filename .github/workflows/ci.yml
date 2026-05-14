@@ -47,11 +47,42 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
+
       - name: gofmt
         run: |
-          out=$(gofmt -l .)
+          out=$(gofmt -s -l .)
           if [ -n "$out" ]; then
-            echo "Files need gofmt:"
+            echo "Files need gofmt -s:"
             echo "$out"
             exit 1
           fi
+
+      - name: staticcheck
+        uses: dominikh/staticcheck-action@v1
+        with:
+          version: latest
+          install-go: false
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Configure git identity
+        run: |
+          git config --global user.email "ci@patchrun.test"
+          git config --global user.name "patchrun-ci"
+          git config --global commit.gpgsign false
+          git config --global init.defaultBranch main
+      - name: Generate coverage
+        run: go test -race -covermode=atomic -coverpkg=./... -coverprofile=coverage.out ./...
+      - name: Coverage summary
+        run: go tool cover -func=coverage.out | tail -1
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.out

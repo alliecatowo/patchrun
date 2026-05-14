@@ -2,7 +2,6 @@ package gitx
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -86,19 +85,6 @@ func (g *Git) StageAll(ctx context.Context, force bool) error {
 	}
 	_, err := g.RunBytes(ctx, args...)
 	return err
-}
-
-// IsInsideWorkTree reports whether g.WorkDir is inside a git working tree.
-func (g *Git) IsInsideWorkTree(ctx context.Context) (bool, error) {
-	out, err := g.RunString(ctx, "rev-parse", "--is-inside-work-tree")
-	if err != nil {
-		var ce *CommandError
-		if errors.As(err, &ce) {
-			return false, nil
-		}
-		return false, err
-	}
-	return out == "true", nil
 }
 
 // HasSubmodulesFile reports whether the repository has a `.gitmodules` file.

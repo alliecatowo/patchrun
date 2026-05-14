@@ -19,9 +19,8 @@ import (
 
 // fixture is a temporary git repository with helpers.
 type fixture struct {
-	t       *testing.T
-	root    string
-	prevCwd string
+	t    *testing.T
+	root string
 }
 
 func newFixture(t *testing.T) *fixture {

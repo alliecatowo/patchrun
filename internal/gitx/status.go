@@ -152,10 +152,7 @@ func parsePorcelainZ(data []byte) ([]StatusEntry, error) {
 	if len(data) == 0 {
 		return nil, nil
 	}
-	s := string(data)
-	if strings.HasSuffix(s, "\x00") {
-		s = s[:len(s)-1]
-	}
+	s := strings.TrimSuffix(string(data), "\x00")
 	fields := strings.Split(s, "\x00")
 	var out []StatusEntry
 	for i := 0; i < len(fields); i++ {
