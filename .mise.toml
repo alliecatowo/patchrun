@@ -1,0 +1,60 @@
+[tools]
+go = "latest"
+
+[tasks.all]
+description = "Run lint, tests, and build"
+run = ["mise run lint", "mise run test", "mise run build"]
+
+[tasks.build]
+description = "Build patchrun into ./bin/patchrun"
+run = [
+  "mkdir -p bin",
+  "go build -trimpath -ldflags \"-X main.version=$(git describe --tags --always --dirty 2>/dev/null || echo dev)\" -o bin/patchrun ./cmd/patchrun",
+]
+
+[tasks.install]
+description = "Install patchrun to GOBIN"
+run = "go install -trimpath -ldflags \"-X main.version=$(git describe --tags --always --dirty 2>/dev/null || echo dev)\" ./cmd/patchrun"
+
+[tasks.test]
+description = "Run all tests with -race"
+run = "go test -race -count=1 ./..."
+
+[tasks.race]
+description = "Alias for test"
+run = "mise run test"
+
+[tasks.vet]
+description = "Run go vet"
+run = "go vet ./..."
+
+[tasks.fmt]
+description = "Run gofmt -s -w"
+run = "gofmt -s -w ."
+
+[tasks."fmt-check"]
+description = "Fail if gofmt would make changes"
+run = [
+  "out=$(gofmt -s -l .)",
+  "if [ -n \"$out\" ]; then echo \"Files need gofmt:\"; echo \"$out\"; exit 1; fi",
+]
+
+[tasks.lint]
+description = "Run format and static checks"
+run = ["mise run fmt-check", "mise run vet"]
+
+[tasks.cover]
+description = "Generate and summarize coverage"
+run = [
+  "go test -race -covermode=atomic -coverpkg=./... -coverprofile=coverage.out ./...",
+  "go tool cover -func=coverage.out | tail -1",
+  "echo \"HTML report: go tool cover -html=coverage.out\"",
+]
+
+[tasks.clean]
+description = "Remove build and coverage artifacts"
+run = "rm -rf bin coverage.out coverage.html"
+
+[tasks.help]
+description = "Show available tasks"
+run = "mise tasks"

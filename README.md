@@ -247,7 +247,7 @@ about to run, so `patchrun -- git <tab>` completes git subcommands.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Run `make test` to execute the full
+See [CONTRIBUTING.md](CONTRIBUTING.md). Run `mise run test` to execute the full
 suite locally.
 
 ## License

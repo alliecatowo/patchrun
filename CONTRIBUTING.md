@@ -18,13 +18,13 @@ go build ./cmd/patchrun
 go test ./...
 ```
 
-Common targets are in the [`Makefile`](Makefile):
+Common tasks are in [`.mise.toml`](.mise.toml):
 
 ```bash
-make test      # go test -race ./...
-make lint      # gofmt + go vet
-make build     # build the binary into ./bin/patchrun
-make cover     # coverage report
+mise run test      # go test -race ./...
+mise run lint      # gofmt + go vet
+mise run build     # build the binary into ./bin/patchrun
+mise run cover     # coverage report
 ```
 
 ## Tests

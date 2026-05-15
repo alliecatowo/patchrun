@@ -4,8 +4,8 @@
 
 ## Test plan
 
-- [ ] `make test` passes
-- [ ] `make lint` passes
+- [ ] `mise run test` passes
+- [ ] `mise run lint` passes
 - [ ] Added a test that fails on `main` and passes on this branch
 - [ ] Updated CHANGELOG.md under `## [Unreleased]` if user-visible
 
