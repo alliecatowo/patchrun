@@ -3,6 +3,7 @@ package run
 import (
 	"bytes"
 	"context"
+	"io"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -120,5 +121,50 @@ func TestRun_ContextCancel(t *testing.T) {
 	}
 	if time.Since(start) > 2*time.Second {
 		t.Fatalf("cancel took too long: %v", time.Since(start))
+	}
+}
+
+func TestRun_UsePTY(t *testing.T) {
+	skipIfNoSh(t)
+	var out bytes.Buffer
+	res := Run(context.Background(), Spec{
+		Args:   []string{"sh", "-c", "echo pty-ok"},
+		Stdout: &out,
+		UsePTY: true,
+	})
+	if res.Err != nil && strings.Contains(res.Err.Error(), "operation not permitted") {
+		t.Skip("pty not permitted in this environment")
+	}
+	if res.ExitCode != 0 {
+		t.Fatalf("exit %d err=%v", res.ExitCode, res.Err)
+	}
+	if !strings.Contains(out.String(), "pty-ok") {
+		t.Fatalf("stdout: %q", out.String())
+	}
+}
+
+func TestRun_UsePTY_DoesNotHangOnBlockedStdinAfterChildExit(t *testing.T) {
+	skipIfNoSh(t)
+
+	// Intentionally provide a stdin reader that can block forever unless the
+	// PTY shutdown path is correct.
+	pr, _ := io.Pipe()
+	defer pr.Close()
+
+	start := time.Now()
+	res := Run(context.Background(), Spec{
+		Args:   []string{"sh", "-c", "exit 0"},
+		Stdin:  pr,
+		Stdout: &bytes.Buffer{},
+		UsePTY: true,
+	})
+	if res.Err != nil && strings.Contains(res.Err.Error(), "operation not permitted") {
+		t.Skip("pty not permitted in this environment")
+	}
+	if res.ExitCode != 0 {
+		t.Fatalf("exit %d err=%v", res.ExitCode, res.Err)
+	}
+	if took := time.Since(start); took > 2*time.Second {
+		t.Fatalf("PTY run should return promptly after child exit, took %v", took)
 	}
 }

@@ -27,6 +27,9 @@ func TestParseOptions_HappyPath(t *testing.T) {
 	if !opts.Stat {
 		t.Fatalf("stat should default to true")
 	}
+	if opts.InteractionMode != "ask" {
+		t.Fatalf("interaction mode default should be ask, got %q", opts.InteractionMode)
+	}
 }
 
 func TestParseOptions_MissingSeparator(t *testing.T) {
@@ -106,5 +109,21 @@ func TestParseOptions_Help(t *testing.T) {
 	_, err := parse(t, "--help")
 	if _, ok := err.(HelpError); !ok {
 		t.Fatalf("expected HelpError, got %T %v", err, err)
+	}
+}
+
+func TestParseOptions_InteractionMode(t *testing.T) {
+	for _, mode := range []string{"ask", "strict", "allow"} {
+		opts, err := parse(t, "--interaction-mode", mode, "--", "echo", "x")
+		if err != nil {
+			t.Fatalf("mode %q: %v", mode, err)
+		}
+		if opts.InteractionMode != mode {
+			t.Fatalf("mode %q not parsed, got %q", mode, opts.InteractionMode)
+		}
+	}
+	_, err := parse(t, "--interaction-mode", "weird", "--", "echo", "x")
+	if err == nil || !strings.Contains(err.Error(), "invalid --interaction-mode value") {
+		t.Fatalf("expected invalid interaction mode error, got %v", err)
 	}
 }

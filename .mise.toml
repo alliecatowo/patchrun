@@ -1,5 +1,5 @@
 [tools]
-go = "latest"
+go = "1.26.3"
 
 [tasks.all]
 description = "Run lint, tests, and build"

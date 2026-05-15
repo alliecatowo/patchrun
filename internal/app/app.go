@@ -83,10 +83,22 @@ type errorResult struct {
 // Run is the entry point. It returns an exit code suitable for os.Exit.
 func Run(parentCtx context.Context, argv []string, io IO, version string) int {
 	opts, err := ParseOptions(argv, io.Stderr, version)
+	colorMode := colorModeFromArgs(argv)
+	if opts != nil {
+		switch opts.Color {
+		case "always":
+			colorMode = textui.ColorAlways
+		case "never":
+			colorMode = textui.ColorNever
+		default:
+			colorMode = textui.ColorAuto
+		}
+	}
+	helpColor := textui.NewColorizer(colorMode, io.Stderr)
 	if err != nil {
 		switch e := err.(type) {
 		case HelpError:
-			fmt.Fprint(io.Stderr, helpText(version))
+			fmt.Fprint(io.Stderr, colorizeHelpText(helpText(version), helpColor))
 			_ = e
 			return ExitOK
 		case VersionError:
@@ -95,7 +107,7 @@ func Run(parentCtx context.Context, argv []string, io IO, version string) int {
 			return ExitOK
 		case *UsageError:
 			fmt.Fprintf(io.Stderr, "error: %s\n\n", e.Msg)
-			fmt.Fprint(io.Stderr, helpText(version))
+			fmt.Fprint(io.Stderr, colorizeHelpText(helpText(version), helpColor))
 			return ExitInvalidUsage
 		default:
 			fmt.Fprintf(io.Stderr, "error: %s\n", err.Error())
@@ -121,7 +133,7 @@ func Run(parentCtx context.Context, argv []string, io IO, version string) int {
 		}
 	}()
 
-	colorMode := textui.ColorAuto
+	colorMode = textui.ColorAuto
 	switch opts.Color {
 	case "always":
 		colorMode = textui.ColorAlways
@@ -137,6 +149,63 @@ func Run(parentCtx context.Context, argv []string, io IO, version string) int {
 		rr.colorOut = textui.NewColorizer(textui.ColorNever, io.Stdout)
 	}
 	return rr.execute(ctx)
+}
+
+func colorModeFromArgs(argv []string) textui.ColorMode {
+	for i := 0; i < len(argv); i++ {
+		arg := argv[i]
+		if arg == "--color" && i+1 < len(argv) {
+			switch argv[i+1] {
+			case "always":
+				return textui.ColorAlways
+			case "never":
+				return textui.ColorNever
+			default:
+				return textui.ColorAuto
+			}
+		}
+		if strings.HasPrefix(arg, "--color=") {
+			switch strings.TrimPrefix(arg, "--color=") {
+			case "always":
+				return textui.ColorAlways
+			case "never":
+				return textui.ColorNever
+			default:
+				return textui.ColorAuto
+			}
+		}
+	}
+	return textui.ColorAuto
+}
+
+func colorizeHelpText(help string, c *textui.Colorizer) string {
+	if c == nil || !c.Enabled() {
+		return help
+	}
+	lines := strings.Split(help, "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		switch trimmed {
+		case "Usage:", "Examples:", "Options:":
+			lines[i] = c.Bold(c.Cyan(trimmed))
+			continue
+		}
+		if strings.HasPrefix(line, "  --") || strings.HasPrefix(line, "  -h,") {
+			// Keep formatting simple and stable: color the option token block.
+			option := strings.TrimSpace(line)
+			desc := ""
+			if idx := strings.Index(option, "  "); idx >= 0 {
+				desc = strings.TrimSpace(option[idx:])
+				option = strings.TrimSpace(option[:idx])
+			}
+			if desc == "" {
+				lines[i] = "  " + c.Yellow(option)
+			} else {
+				lines[i] = "  " + c.Yellow(option) + "  " + desc
+			}
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 type runner struct {
@@ -165,6 +234,7 @@ type runner struct {
 	baselineRef       string
 	cmdResult         run.Result
 	patchBytes        []byte
+	childUsedPTY      bool
 	nameStatusEntries []textui.NameStatusEntry
 	numstatEntries    []textui.NumstatEntry
 	totals            textui.Totals
@@ -361,18 +431,32 @@ func (r *runner) run(ctx context.Context) int {
 
 	// 10. Run the command in temp worktree.
 	r.cmdResult = r.runChildCommand(ctx)
+	if r.cmdResult.ExitCode == ExitInvalidUsage && r.cmdResult.Err != nil &&
+		strings.Contains(r.cmdResult.Err.Error(), "interaction policy") {
+		return ExitInvalidUsage
+	}
 
 	exitFromChild := r.cmdResult.ExitCode
 	if r.cmdResult.TimedOut {
 		exitFromChild = ExitTimeout
-	} else if r.cmdResult.Err != nil && r.cmdResult.ExitCode == 0 {
+	} else if r.cmdResult.Err != nil {
 		fmt.Fprintf(r.io.Stderr, "error: %v\n", r.cmdResult.Err)
-		exitFromChild = ExitGeneralFailure
+		if r.cmdResult.ExitCode == 0 {
+			exitFromChild = ExitGeneralFailure
+		}
 	}
 
-	r.logHuman("\nCommand exited: %d (%s)", r.cmdResult.ExitCode, r.cmdResult.Duration.Round(time.Millisecond))
+	exitLabel := r.colorErr.Green("Command exited:")
+	if r.cmdResult.ExitCode != 0 {
+		exitLabel = r.colorErr.Red("Command exited:")
+	}
+	r.logHuman("\n%s %d (%s)", exitLabel, r.cmdResult.ExitCode, r.cmdResult.Duration.Round(time.Millisecond))
 	if r.cmdResult.TimedOut {
 		r.logHuman("%s command timed out", r.colorErr.Red("warning:"))
+	}
+	if r.childUsedPTY && r.cmdResult.ExitCode != 0 && r.cmdResult.Duration < 2*time.Second {
+		r.logHuman("%s child exited quickly in PTY mode; this may be tool policy (for example untrusted config behavior).", r.colorErr.Yellow("hint:"))
+		r.logHuman("try direct diagnostics: `mise install -v` and `mise trust` in the original repo.")
 	}
 
 	// 10b. Run any --exec follow-ups in the same temp worktree. Their output
@@ -404,7 +488,7 @@ func (r *runner) run(ctx context.Context) int {
 
 	// 12. Empty patch?
 	if gitx.PatchIsEmpty(patch) {
-		r.logHuman(r.colorErr.Dim("No repo changes."))
+		r.logHuman(r.colorErr.Cyan("No repo changes."))
 		if r.cmdResult.TimedOut {
 			return ExitTimeout
 		}
@@ -466,6 +550,62 @@ func (r *runner) canPrompt() bool {
 		return true
 	}
 	return StdinIsTTY(r.io.Stdin)
+}
+
+func likelyInteractiveCommand(args []string) bool {
+	if len(args) == 0 {
+		return false
+	}
+	base := strings.ToLower(filepath.Base(args[0]))
+	switch base {
+	case "mise", "fzf", "less", "more", "vim", "nvim", "nano", "top", "htop", "watch", "dialog", "whiptail":
+		return true
+	}
+	return false
+}
+
+func (r *runner) shouldUsePTYForChild() (bool, int) {
+	mode := r.opts.InteractionMode
+	if mode == "" {
+		mode = "ask"
+	}
+	switch mode {
+	case "allow":
+		return true, ExitOK
+	case "strict":
+		if likelyInteractiveCommand(r.opts.Command) {
+			fmt.Fprintln(r.io.Stderr, "error: command appears interactive and --interaction-mode=strict forbids interactive child sessions.")
+			fmt.Fprintln(r.io.Stderr, "hint: rerun with --interaction-mode=allow to enable PTY child execution.")
+			return false, ExitInvalidUsage
+		}
+		return false, ExitOK
+	case "ask":
+		if !likelyInteractiveCommand(r.opts.Command) {
+			return false, ExitOK
+		}
+		if !r.canPrompt() {
+			fmt.Fprintln(r.io.Stderr, "error: command likely needs an interactive terminal, but prompts are unavailable in this context.")
+			fmt.Fprintln(r.io.Stderr, "hint: rerun with --interaction-mode=allow in an interactive terminal.")
+			return false, ExitInvalidUsage
+		}
+		fmt.Fprintln(r.io.Stderr, r.colorErr.Yellow("warning:"), "command may require an interactive terminal UI.")
+		fmt.Fprintln(r.io.Stderr, "patchrun can run the child under a PTY (less deterministic output, but interactive-safe).")
+		prompter := NewPrompter(r.io.Stdin, r.io.Stderr)
+		ok, err := prompter.Confirm("Run child with interactive PTY?", false)
+		if err != nil {
+			fmt.Fprintf(r.io.Stderr, "error: %v\n", err)
+			return false, ExitInvalidUsage
+		}
+		if !ok {
+			fmt.Fprintln(r.io.Stderr, "aborted: interactive child execution not enabled.")
+			fmt.Fprintln(r.io.Stderr, "hint: use --interaction-mode=allow to skip this prompt.")
+			return false, ExitInvalidUsage
+		}
+		return true, ExitOK
+	default:
+		// Should be unreachable after ParseOptions validation.
+		return false, ExitOK
+	}
 }
 
 func (r *runner) setupTempWorktree(ctx context.Context) error {
@@ -539,18 +679,19 @@ func (r *runner) printBanner() {
 		return
 	}
 	c := r.colorErr
-	fmt.Fprintln(r.io.Stderr, c.Bold("patchrun"))
-	fmt.Fprintf(r.io.Stderr, "repo: %s\n", r.originalRoot)
+	fmt.Fprintln(r.io.Stderr, c.Bold(c.Cyan("patchrun")))
+	fmt.Fprintf(r.io.Stderr, "%s %s\n", c.Bold("repo:"), r.originalRoot)
 	shortHead := r.originalHead
 	if len(shortHead) > 7 {
 		shortHead = shortHead[:7]
 	}
-	fmt.Fprintf(r.io.Stderr, "base: %s %s%s\n",
-		shortHead,
-		r.branch,
+	fmt.Fprintf(r.io.Stderr, "%s %s %s%s\n",
+		c.Bold("base:"),
+		c.Cyan(shortHead),
+		c.Cyan(r.branch),
 		dirtyTag(r.originalDirty, c))
-	fmt.Fprintf(r.io.Stderr, "temp: %s\n", r.tempWorktree)
-	fmt.Fprintf(r.io.Stderr, "\nRunning:\n  %s\n\n", strings.Join(r.opts.Command, " "))
+	fmt.Fprintf(r.io.Stderr, "%s %s\n", c.Bold("temp:"), r.tempWorktree)
+	fmt.Fprintf(r.io.Stderr, "\n%s\n  %s\n\n", c.Bold("Running:"), c.Yellow(strings.Join(r.opts.Command, " ")))
 }
 
 func dirtyTag(dirty bool, c *textui.Colorizer) string {
@@ -584,9 +725,18 @@ func (r *runner) runChildCommand(ctx context.Context) run.Result {
 	// Reader into the child's pipe even if the child never reads — so if we
 	// pass r.io.Stdin to the child and then try to prompt, the prompter sees
 	// EOF.
+	usePTY, earlyExit := r.shouldUsePTYForChild()
+	if earlyExit != ExitOK {
+		return run.Result{ExitCode: earlyExit, Err: errors.New("child command blocked by interaction policy")}
+	}
 	var stdin io.Reader
-	if !r.willPromptAfterChild() {
+	if usePTY || !r.willPromptAfterChild() {
+		// PTY mode needs real stdin for interactive tools.
 		stdin = r.io.Stdin
+	}
+	if usePTY {
+		r.childUsedPTY = true
+		r.logHuman("%s interactive child PTY enabled", r.colorErr.Cyan("note:"))
 	}
 
 	return run.Run(ctx, run.Spec{
@@ -597,6 +747,7 @@ func (r *runner) runChildCommand(ctx context.Context) run.Result {
 		Stdout:  r.io.Stderr, // stream child stdout to our stderr so stdout is reserved for json/patch
 		Stderr:  r.io.Stderr,
 		Timeout: r.opts.CommandTimeout,
+		UsePTY:  usePTY,
 	})
 }
 

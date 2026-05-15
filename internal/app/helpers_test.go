@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/alliecatowo/patchrun/internal/textui"
 )
 
 func TestErrorTypeMessages(t *testing.T) {
@@ -215,5 +217,56 @@ func TestParseOptions_LeftoverPositional(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "before '--'") {
 		t.Fatalf("got: %v", err)
+	}
+}
+
+func TestLikelyInteractiveCommand(t *testing.T) {
+	if !likelyInteractiveCommand([]string{"mise", "install"}) {
+		t.Fatalf("mise install should be considered likely interactive")
+	}
+	if likelyInteractiveCommand([]string{"echo", "hello"}) {
+		t.Fatalf("echo should not be considered interactive")
+	}
+}
+
+func TestShouldUsePTYForChild_StrictBlocksLikelyInteractive(t *testing.T) {
+	var stderr bytes.Buffer
+	r := &runner{
+		opts: &Options{InteractionMode: "strict", Command: []string{"mise", "install"}},
+		io:   IO{Stderr: &stderr},
+	}
+	usePTY, exit := r.shouldUsePTYForChild()
+	if usePTY {
+		t.Fatalf("strict mode should not enable PTY")
+	}
+	if exit != ExitInvalidUsage {
+		t.Fatalf("exit=%d", exit)
+	}
+	if !strings.Contains(stderr.String(), "--interaction-mode=allow") {
+		t.Fatalf("missing guidance in stderr: %q", stderr.String())
+	}
+}
+
+func TestShouldUsePTYForChild_AllowUsesPTY(t *testing.T) {
+	r := &runner{opts: &Options{InteractionMode: "allow", Command: []string{"mise", "install"}}}
+	usePTY, exit := r.shouldUsePTYForChild()
+	if !usePTY || exit != ExitOK {
+		t.Fatalf("got usePTY=%v exit=%d", usePTY, exit)
+	}
+}
+
+func TestShouldUsePTYForChild_AskNoPromptFails(t *testing.T) {
+	var stderr bytes.Buffer
+	r := &runner{
+		opts:     &Options{InteractionMode: "ask", Command: []string{"mise", "install"}, NoInteractive: true},
+		io:       IO{Stdin: stringReaderEmpty{}, Stderr: &stderr},
+		colorErr: textui.NewColorizer(textui.ColorNever, &stderr),
+	}
+	usePTY, exit := r.shouldUsePTYForChild()
+	if usePTY {
+		t.Fatalf("ask mode without prompt should not enable PTY")
+	}
+	if exit != ExitInvalidUsage {
+		t.Fatalf("exit=%d", exit)
 	}
 }
