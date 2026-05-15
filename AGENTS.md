@@ -11,13 +11,13 @@ Patch-focused Go CLI reliability. Optimize for deterministic behavior, clear dia
 - Integration tests: `tests/`
 
 ## Required Workflow
-1. Read `codex/rules/00-priority.md` then applicable rule files.
+1. Read `.agents/rules/00-priority.md` then applicable rule files.
 2. For non-trivial edits, write a short plan in the task thread.
 3. Implement the smallest safe change.
 4. Run verification commands exactly:
    - `mise run lint`
    - `NO_COLOR= go test ./...`
-5. For interactive/PTY changes, also run targeted checks from `codex/rules/40-interactive-pty.md`.
+5. For interactive/PTY changes, also run targeted checks from `.agents/rules/40-interactive-pty.md`.
 
 ## Done Criteria
 - Behavior change has at least one regression test when feasible.
