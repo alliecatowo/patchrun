@@ -26,6 +26,12 @@ first, inspect the patch, then apply (or discard) it.
 ## Install
 
 ```bash
+brew install alliecatowo/tap/patchrun
+```
+
+Or with Go:
+
+```bash
 go install github.com/alliecatowo/patchrun/cmd/patchrun@latest
 ```
 
