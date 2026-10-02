@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -84,13 +85,13 @@ func TestNewRunID_HasExpectedShape(t *testing.T) {
 
 func TestDefaultSavePath_ContainsTimestamp(t *testing.T) {
 	p := defaultSavePath("/tmp/repo")
-	if !strings.Contains(p, "/tmp/repo/.patchrun/patchrun-") || !strings.HasSuffix(p, ".patch") {
+	if !strings.Contains(filepath.ToSlash(p), "/tmp/repo/.patchrun/patchrun-") || !strings.HasSuffix(p, ".patch") {
 		t.Fatalf("unexpected: %q", p)
 	}
 }
 
 func TestRelativePath(t *testing.T) {
-	if got := relativePath("/a/b", "/a/b/c/d"); got != "c/d" {
+	if got := filepath.ToSlash(relativePath("/a/b", "/a/b/c/d")); got != "c/d" {
 		t.Fatalf("got %q", got)
 	}
 }

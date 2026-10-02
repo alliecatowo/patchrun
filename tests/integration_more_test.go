@@ -246,9 +246,9 @@ func TestApply3Way_RecoverableConflict(t *testing.T) {
 	// original repo by committing a change to line 1. A 3-way merge should
 	// still succeed because the hunks don't overlap.
 	script := `set -e
-sed -i 's/line 3/line three/' a.txt
+sed 's/line 3/line three/' a.txt > a.txt.sedtmp && mv a.txt.sedtmp a.txt
 cd "$PATCHRUN_ORIGINAL_ROOT"
-sed -i 's/line 1/LINE 1/' a.txt
+sed 's/line 1/LINE 1/' a.txt > a.txt.sedtmp && mv a.txt.sedtmp a.txt
 git add a.txt
 git -c commit.gpgsign=false commit --no-gpg-sign -q -m drift
 `
@@ -453,8 +453,8 @@ func TestApply_ConflictSavesPatch(t *testing.T) {
 	// content change but not a new HEAD — actually drift detection compares
 	// HEAD AND status, so a content change is enough to trigger drift).
 	script := `set -e
-sed -i 's/alpha/ALPHA/' a.txt
-sed -i 's/alpha/ALPHA-overridden/' "$PATCHRUN_ORIGINAL_ROOT/a.txt"
+sed 's/alpha/ALPHA/' a.txt > a.txt.sedtmp && mv a.txt.sedtmp a.txt
+sed 's/alpha/ALPHA-overridden/' "$PATCHRUN_ORIGINAL_ROOT/a.txt" > "$PATCHRUN_ORIGINAL_ROOT/a.txt.sedtmp" && mv "$PATCHRUN_ORIGINAL_ROOT/a.txt.sedtmp" "$PATCHRUN_ORIGINAL_ROOT/a.txt"
 `
 	args := append([]string{"--no-interactive", "--apply", "--"}, shellArgs(script)...)
 	exit, _, stderr := f.runApp(t, args...)
