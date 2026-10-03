@@ -9,16 +9,24 @@ import (
 	"strings"
 )
 
+// patchDiffArgs returns the leading `git diff` arguments that pin the patch
+// format regardless of the user's git config (diff.noprefix,
+// diff.mnemonicPrefix, diff.external, color.diff), so the emitted patch always
+// uses a/ and b/ prefixes and applies with plain `git apply`.
+func patchDiffArgs() []string {
+	return []string{"diff", "--no-ext-diff", "--no-color", "--src-prefix=a/", "--dst-prefix=b/"}
+}
+
 // DiffBinary returns `git diff --binary <base>` bytes (tracked staged+unstaged
 // changes relative to base). It does NOT include untracked files.
 func (g *Git) DiffBinary(ctx context.Context, base string) ([]byte, error) {
-	return g.RunBytes(ctx, "diff", "--binary", base)
+	return g.RunBytes(ctx, append(patchDiffArgs(), "--binary", base)...)
 }
 
 // DiffBinaryCachedOpt returns `git diff --binary --cached [-R] <base> -- <pathspecs>`.
 // reverse=true swaps - and + so applying the result undoes the captured change.
 func (g *Git) DiffBinaryCachedOpt(ctx context.Context, base string, pathspecs []string, reverse bool) ([]byte, error) {
-	args := []string{"diff", "--binary", "--cached"}
+	args := append(patchDiffArgs(), "--binary", "--cached")
 	if reverse {
 		args = append(args, "-R")
 	}
