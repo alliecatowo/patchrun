@@ -74,8 +74,8 @@ func TestCheckOnly_ReportsFailureWhenDoesntApply(t *testing.T) {
 	f.git("commit", "-q", "--no-gpg-sign", "-m", "initial")
 	// Drift after the command runs (script also modifies original).
 	script := `set -e
-sed -i 's/hello/HELLO/' a.txt
-sed -i 's/hello/conflict/' "$PATCHRUN_ORIGINAL_ROOT/a.txt"
+sed 's/hello/HELLO/' a.txt > a.txt.sedtmp && mv a.txt.sedtmp a.txt
+sed 's/hello/conflict/' "$PATCHRUN_ORIGINAL_ROOT/a.txt" > "$PATCHRUN_ORIGINAL_ROOT/a.txt.sedtmp" && mv "$PATCHRUN_ORIGINAL_ROOT/a.txt.sedtmp" "$PATCHRUN_ORIGINAL_ROOT/a.txt"
 `
 	args := append([]string{"--no-interactive", "--check", "--apply", "--"}, shellArgs(script)...)
 	exit, _, stderr := f.runApp(t, args...)

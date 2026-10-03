@@ -58,6 +58,26 @@ changelog:
       - "Merge pull request"
       - "Merge branch"
 
+# Pushes Formula/patchrun.rb to alliecatowo/homebrew-tap over SSH with a
+# write deploy key (secret HOMEBREW_TAP_DEPLOY_KEY); no PAT needed.
+brews:
+  - repository:
+      owner: alliecatowo
+      name: homebrew-tap
+      branch: main
+      git:
+        url: "git@github.com:alliecatowo/homebrew-tap.git"
+        private_key: "{{ .Env.HOMEBREW_TAP_DEPLOY_KEY }}"
+    directory: Formula
+    name: patchrun
+    homepage: "https://github.com/alliecatowo/patchrun"
+    description: "Run any command as a patch before it touches your repo"
+    license: "MIT"
+    install: |
+      bin.install "patchrun"
+    test: |
+      assert_match "Usage:", shell_output("#{bin}/patchrun --help 2>&1")
+
 release:
   github:
     owner: alliecatowo
@@ -70,5 +90,7 @@ release:
 
     Install:
     ```bash
+    brew install alliecatowo/tap/patchrun
+    # or
     go install github.com/alliecatowo/patchrun/cmd/patchrun@{{ .Tag }}
     ```
