@@ -37,8 +37,8 @@ go install github.com/alliecatowo/patchrun/cmd/patchrun@latest
 
 Requires `git` on `PATH` (any version that supports `git worktree`).
 
-There are no tagged releases yet, so `@latest` installs the newest commit as a pseudo-version
-(`patchrun --version` will not show a release number), and no prebuilt binaries are published.
+Prebuilt binaries for Linux, macOS and Windows (amd64/arm64) are attached to each
+[GitHub release](https://github.com/alliecatowo/patchrun/releases).
 
 ## Examples
 
