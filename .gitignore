@@ -19,3 +19,4 @@ coverage.html
 !.env.example
 .mcp.json
 *.log
+/site/public/

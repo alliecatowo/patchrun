@@ -1,0 +1,16 @@
+base_url = "https://alliecatowo.github.io/patchrun"
+title = "patchrun"
+description = "Run any command in a disposable git worktree and review the patch before it touches your repo."
+compile_sass = true
+build_search_index = false
+generate_feeds = false
+
+[markdown]
+
+[markdown.highlighting]
+light_theme = "catppuccin-latte"
+dark_theme = "catppuccin-mocha"
+style = "class"
+
+[extra]
+repo = "https://github.com/alliecatowo/patchrun"

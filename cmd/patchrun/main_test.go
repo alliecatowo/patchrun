@@ -60,3 +60,9 @@ func TestRealMain_Version(t *testing.T) {
 		t.Fatalf("got %q", stdout.String())
 	}
 }
+
+func TestBuildVersionIsNeverEmpty(t *testing.T) {
+	if buildVersion() == "" {
+		t.Fatal("buildVersion returned an empty string")
+	}
+}
