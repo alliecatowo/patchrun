@@ -4,7 +4,7 @@ go 1.26
 
 require (
 	github.com/creack/pty v1.1.24
-	github.com/spf13/pflag v1.0.5
+	github.com/spf13/pflag v1.0.10
 	golang.org/x/term v0.20.0
 )
 
