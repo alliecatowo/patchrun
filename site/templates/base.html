@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% if page.title %}{{ page.title }} · {% endif %}{{ config.title }}</title>
+<title>{% block title %}{{ config.title }}{% endblock %}</title>
 <meta name="description" content="{{ config.description }}">
 <link rel="stylesheet" href="{{ get_url(path="style.css") }}">
-<link rel="stylesheet" href="{{ get_url(path='syntax-light.css') }}" media="(prefers-color-scheme: light)">
-<link rel="stylesheet" href="{{ get_url(path='syntax-dark.css') }}" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="{{ get_url(path='giallo-light.css') }}" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="{{ get_url(path='giallo-dark.css') }}" media="(prefers-color-scheme: dark)">
 </head>
 <body>
 <header class="top">
