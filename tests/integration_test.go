@@ -111,9 +111,11 @@ func (f *fixture) runApp(t *testing.T, args ...string) (int, string, string) {
 	return exit, stdout.String(), stderr.String()
 }
 
-// shellArgs returns a portable shell command. On Windows, use cmd.exe /c.
+// shellArgs returns a shell command that runs script. The scripts use POSIX
+// syntax (set -e, sed, $VAR, &&), so prefer sh everywhere, including Windows
+// where Git for Windows ships it. Fall back to cmd.exe only if sh is missing.
 func shellArgs(script string) []string {
-	if runtime.GOOS == "windows" {
+	if _, err := exec.LookPath("sh"); err != nil && runtime.GOOS == "windows" {
 		return []string{"cmd.exe", "/c", script}
 	}
 	return []string{"sh", "-c", script}

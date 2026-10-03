@@ -14,3 +14,8 @@ coverage.html
 .vscode/
 *.swp
 .DS_Store
+.env
+.env.*
+!.env.example
+.mcp.json
+*.log

@@ -27,24 +27,27 @@ const (
 
 // Options is the parsed CLI configuration.
 type Options struct {
-	Apply            bool
-	Apply3Way        bool
-	SavePath         string
-	Stdout           bool
-	JSON             bool
-	Keep             bool
-	WorktreeDir      string
-	Name             string
-	AllowDirty       bool
-	FailOnDirty      bool
-	IncludeIgnored   bool
-	Includes         []string
-	Excludes         []string
-	ShowDiff         bool
-	Stat             bool
-	StatExplicit     bool // user passed --stat or --no-stat
-	Interactive      bool
-	NoInteractive    bool
+	Apply          bool
+	Apply3Way      bool
+	SavePath       string
+	Stdout         bool
+	JSON           bool
+	Keep           bool
+	WorktreeDir    string
+	Name           string
+	AllowDirty     bool
+	FailOnDirty    bool
+	IncludeIgnored bool
+	Includes       []string
+	Excludes       []string
+	ShowDiff       bool
+	Stat           bool
+	StatExplicit   bool // user passed --stat or --no-stat
+	Interactive    bool
+	NoInteractive  bool
+	// InteractionMode controls child command interactivity policy:
+	// ask (default), strict, allow.
+	InteractionMode  string
 	CommandTimeout   time.Duration
 	Quiet            bool
 	Verbose          bool
@@ -143,6 +146,7 @@ func ParseOptions(argv []string, helpWriter io.Writer, version string) (*Options
 	noStatFlag := fs.Bool("no-stat", false, "Hide diffstat")
 	fs.BoolVar(&opts.Interactive, "interactive", false, "Force interactive menu")
 	fs.BoolVar(&opts.NoInteractive, "no-interactive", false, "Disable prompts")
+	fs.StringVar(&opts.InteractionMode, "interaction-mode", "ask", "Child interactivity policy: ask|strict|allow")
 	fs.DurationVar(&opts.CommandTimeout, "command-timeout", 0, "Kill command after duration")
 	fs.BoolVar(&opts.Quiet, "quiet", false, "Less output")
 	fs.BoolVar(&opts.Verbose, "verbose", false, "More output")
@@ -203,6 +207,11 @@ func ParseOptions(argv []string, helpWriter io.Writer, version string) (*Options
 	case "auto", "always", "never":
 	default:
 		return nil, &UsageError{Msg: fmt.Sprintf("invalid --color value %q: want auto|always|never", opts.Color)}
+	}
+	switch opts.InteractionMode {
+	case "ask", "strict", "allow":
+	default:
+		return nil, &UsageError{Msg: fmt.Sprintf("invalid --interaction-mode value %q: want ask|strict|allow", opts.InteractionMode)}
 	}
 	if opts.CompletionShell != "" {
 		switch opts.CompletionShell {
@@ -273,6 +282,7 @@ Options:
   --no-stat                     Hide diffstat
   --interactive                 Force interactive menu
   --no-interactive              Disable prompts
+  --interaction-mode <mode>     Child interactivity policy: ask|strict|allow
   --command-timeout <duration>  Kill command after duration (e.g. 30s, 5m)
   --color <mode>                Color output: auto|always|never
   --no-sidecar                  Skip the .meta.json sidecar next to saved patches
