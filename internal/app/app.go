@@ -328,7 +328,7 @@ func (r *runner) run(ctx context.Context) int {
 		return ExitNotInRepo
 	}
 	r.originalRoot = root
-	rel, err := filepath.Rel(root, cwd)
+	rel, err := filepath.Rel(canonicalPath(root), canonicalPath(cwd))
 	if err != nil {
 		rel = "."
 	}
@@ -1217,6 +1217,18 @@ func exitMessage(code int) string {
 func defaultSavePath(repoRoot string) string {
 	ts := time.Now().Format("20060102-150405")
 	return filepath.Join(repoRoot, ".patchrun", "patchrun-"+ts+".patch")
+}
+
+// canonicalPath returns p with symlinks resolved and, on Windows, 8.3 short
+// names (RUNNER~1) expanded to their long form. `git rev-parse --show-toplevel`
+// reports the long form with forward slashes while os.Getwd can report the
+// short form, and filepath.Rel between the two yields a bogus "../.." path that
+// makes the child run outside the temp worktree. Falls back to a cleaned p.
+func canonicalPath(p string) string {
+	if resolved, err := filepath.EvalSymlinks(p); err == nil {
+		return filepath.Clean(resolved)
+	}
+	return filepath.Clean(p)
 }
 
 func relativePath(root, p string) string {
