@@ -1,0 +1,31 @@
+// Catppuccin Latte (light) / Mocha (dark). Mauve accent.
+:root {
+  --base: #eff1f5; --mantle: #e6e9ef; --surface: #ccd0da; --text: #4c4f69;
+  --sub: #6c6f85; --accent: #8839ef; --link: #1e66f5; --green: #40a02b; --red: #d20f39;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --base: #1e1e2e; --mantle: #181825; --surface: #313244; --text: #cdd6f4;
+    --sub: #a6adc8; --accent: #cba6f7; --link: #89b4fa; --green: #a6e3a1; --red: #f38ba8;
+  }
+}
+* { box-sizing: border-box; }
+html { background: var(--base); color: var(--text); }
+body { margin: 0; font: 16px/1.65 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+a { color: var(--link); }
+code, pre, .brand { font-family: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; }
+.top, main, footer { max-width: 52rem; margin: 0 auto; padding-left: 1rem; padding-right: 1rem; }
+.top { display: flex; justify-content: space-between; align-items: baseline; padding-top: 1.25rem; padding-bottom: 1.25rem; }
+.brand { font-weight: 700; font-size: 1.15rem; color: var(--accent); text-decoration: none; }
+nav a { margin-left: 1.25rem; color: var(--sub); text-decoration: none; }
+nav a:hover { color: var(--text); }
+h1 { font-family: ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace; font-size: clamp(1.7rem, 5vw, 2.6rem); line-height: 1.15; margin: 1.5rem 0 1rem; }
+h2 { margin-top: 2.5rem; font-size: 1.3rem; }
+.lede { font-size: 1.1rem; color: var(--sub); max-width: 40rem; }
+pre { background: var(--mantle); border: 1px solid var(--surface); border-radius: 6px; padding: 0.9rem 1rem; overflow-x: auto; font-size: 0.88rem; line-height: 1.5; }
+:not(pre) > code { background: var(--mantle); padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.9em; }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; display: block; overflow-x: auto; }
+th, td { text-align: left; padding: 0.4rem 0.7rem; border-bottom: 1px solid var(--surface); vertical-align: top; }
+td:first-child { white-space: nowrap; }
+footer { padding-top: 3rem; padding-bottom: 2rem; color: var(--sub); font-size: 0.9rem; }
+.doc, .hero { padding-bottom: 1rem; }

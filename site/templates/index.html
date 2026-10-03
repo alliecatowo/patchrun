@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <h1>Command in, patch out.</h1>
+  <p class="lede">patchrun runs a command in a disposable git worktree and hands you the resulting patch. Look at it, then apply or discard. Installs, generators, codemods, formatters and AI-suggested commands all get the same review step.</p>
+{{ section.content | safe }}
+</section>
+{% endblock %}

@@ -1,0 +1,17 @@
+base_url = "https://alliecatowo.github.io/patchrun"
+title = "patchrun"
+description = "Run any command in a disposable git worktree and review the patch before it touches your repo."
+compile_sass = true
+build_search_index = false
+generate_feeds = false
+
+[markdown]
+highlight_code = true
+highlight_theme = "css"
+highlight_themes_css = [
+  { theme = "dracula", filename = "syntax-dark.css" },
+  { theme = "base16-ocean-light", filename = "syntax-light.css" },
+]
+
+[extra]
+repo = "https://github.com/alliecatowo/patchrun"
