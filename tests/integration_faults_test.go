@@ -29,8 +29,8 @@ func TestApply_3WayBranchExercised(t *testing.T) {
 
 	// Script modifies line3 in temp; rewrites line1 in original (status stays " M").
 	script := `set -e
-sed -i 's/line3/LINE3/' a.txt
-sed -i 's/LINE1/ORIGINAL1/' "$PATCHRUN_ORIGINAL_ROOT/a.txt"
+sed 's/line3/LINE3/' a.txt > a.txt.sedtmp && mv a.txt.sedtmp a.txt
+sed 's/LINE1/ORIGINAL1/' "$PATCHRUN_ORIGINAL_ROOT/a.txt" > "$PATCHRUN_ORIGINAL_ROOT/a.txt.sedtmp" && mv "$PATCHRUN_ORIGINAL_ROOT/a.txt.sedtmp" "$PATCHRUN_ORIGINAL_ROOT/a.txt"
 `
 	args := append([]string{
 		"--no-interactive",

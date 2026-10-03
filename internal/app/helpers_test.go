@@ -3,6 +3,8 @@ package app
 import (
 	"bytes"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -84,13 +86,13 @@ func TestNewRunID_HasExpectedShape(t *testing.T) {
 
 func TestDefaultSavePath_ContainsTimestamp(t *testing.T) {
 	p := defaultSavePath("/tmp/repo")
-	if !strings.Contains(p, "/tmp/repo/.patchrun/patchrun-") || !strings.HasSuffix(p, ".patch") {
+	if !strings.Contains(filepath.ToSlash(p), "/tmp/repo/.patchrun/patchrun-") || !strings.HasSuffix(p, ".patch") {
 		t.Fatalf("unexpected: %q", p)
 	}
 }
 
 func TestRelativePath(t *testing.T) {
-	if got := relativePath("/a/b", "/a/b/c/d"); got != "c/d" {
+	if got := filepath.ToSlash(relativePath("/a/b", "/a/b/c/d")); got != "c/d" {
 		t.Fatalf("got %q", got)
 	}
 }
@@ -268,5 +270,27 @@ func TestShouldUsePTYForChild_AskNoPromptFails(t *testing.T) {
 	}
 	if exit != ExitInvalidUsage {
 		t.Fatalf("exit=%d", exit)
+	}
+}
+
+func TestCanonicalPath_ResolvesSymlinksAndCleans(t *testing.T) {
+	dir := t.TempDir()
+	real := filepath.Join(dir, "real")
+	if err := os.Mkdir(real, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "link")
+	if err := os.Symlink(real, link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	want, err := filepath.EvalSymlinks(real)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := canonicalPath(link + string(filepath.Separator) + "."); got != want {
+		t.Fatalf("canonicalPath = %q, want %q", got, want)
+	}
+	if got := canonicalPath(filepath.Join(dir, "missing", "..", "x")); got != filepath.Join(dir, "x") {
+		t.Fatalf("missing path should only be cleaned, got %q", got)
 	}
 }
