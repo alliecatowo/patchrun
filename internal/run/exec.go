@@ -27,6 +27,7 @@ type Spec struct {
 	Stdout  io.Writer
 	Stderr  io.Writer
 	Timeout time.Duration
+	UsePTY  bool
 }
 
 // Run executes spec and returns its result. ctx cancellation also terminates the command.
@@ -45,15 +46,19 @@ func Run(ctx context.Context, spec Spec) Result {
 	cmd := exec.CommandContext(runCtx, spec.Args[0], spec.Args[1:]...)
 	cmd.Dir = spec.Dir
 	cmd.Env = spec.Env
-	cmd.Stdin = spec.Stdin
-	cmd.Stdout = spec.Stdout
-	cmd.Stderr = spec.Stderr
-	configurePlatform(cmd)
-	cmd.Cancel = func() error {
-		return killProcessGroup(cmd)
+	err := error(nil)
+	if spec.UsePTY {
+		err = runWithPTY(runCtx, cmd, spec)
+	} else {
+		cmd.Stdin = spec.Stdin
+		cmd.Stdout = spec.Stdout
+		cmd.Stderr = spec.Stderr
+		configurePlatform(cmd)
+		cmd.Cancel = func() error {
+			return killProcessGroup(cmd)
+		}
+		err = cmd.Run()
 	}
-
-	err := cmd.Run()
 	dur := time.Since(start)
 
 	res := Result{Duration: dur}

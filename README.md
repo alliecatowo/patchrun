@@ -26,10 +26,19 @@ first, inspect the patch, then apply (or discard) it.
 ## Install
 
 ```bash
+brew install alliecatowo/tap/patchrun
+```
+
+Or with Go:
+
+```bash
 go install github.com/alliecatowo/patchrun/cmd/patchrun@latest
 ```
 
 Requires `git` on `PATH` (any version that supports `git worktree`).
+
+Prebuilt binaries for Linux, macOS and Windows (amd64/arm64) are attached to each
+[GitHub release](https://github.com/alliecatowo/patchrun/releases).
 
 ## Examples
 
@@ -247,7 +256,7 @@ about to run, so `patchrun -- git <tab>` completes git subcommands.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Run `make test` to execute the full
+See [CONTRIBUTING.md](CONTRIBUTING.md). Run `mise run test` to execute the full
 suite locally.
 
 ## License
