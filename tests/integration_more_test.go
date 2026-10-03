@@ -357,7 +357,14 @@ func TestEnvVarsExposedToChild(t *testing.T) {
 	if !bytes.Contains(patch, []byte("PATCHRUN=1")) {
 		t.Fatalf("PATCHRUN=1 env not exposed:\n%s", patch)
 	}
-	if !bytes.Contains(patch, []byte(fmt.Sprintf("ROOT=%s", f.root))) {
+	// The tool reports git's resolved top-level (symlinks followed, 8.3 names
+	// expanded, forward slashes), so compare against the same canonical form
+	// of the fixture root (/var -> /private/var on macOS, RUNNER~1 on Windows).
+	wantRoot := f.root
+	if resolved, err := filepath.EvalSymlinks(f.root); err == nil {
+		wantRoot = resolved
+	}
+	if !bytes.Contains(patch, []byte(fmt.Sprintf("ROOT=%s", filepath.ToSlash(wantRoot)))) {
 		t.Fatalf("PATCHRUN_ORIGINAL_ROOT not exposed:\n%s", patch)
 	}
 	if !bytes.Contains(patch, []byte("WORKTREE=/")) && !bytes.Contains(patch, []byte("WORKTREE=")) {
