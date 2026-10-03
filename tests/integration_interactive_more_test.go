@@ -108,8 +108,8 @@ func TestApply_3WaySucceedsWhereNormalFails(t *testing.T) {
 	f.git("commit", "-q", "--no-gpg-sign", "-m", "initial")
 	// Modify line3 in temp, line1 in original (non-overlapping hunks ought to allow 3-way).
 	script := `set -e
-sed -i 's/line3/LINE3/' a.txt
-sed -i 's/line1/L1/' "$PATCHRUN_ORIGINAL_ROOT/a.txt"
+sed 's/line3/LINE3/' a.txt > a.txt.sedtmp && mv a.txt.sedtmp a.txt
+sed 's/line1/L1/' "$PATCHRUN_ORIGINAL_ROOT/a.txt" > "$PATCHRUN_ORIGINAL_ROOT/a.txt.sedtmp" && mv "$PATCHRUN_ORIGINAL_ROOT/a.txt.sedtmp" "$PATCHRUN_ORIGINAL_ROOT/a.txt"
 `
 	args := append([]string{"--no-interactive", "--apply", "--apply-3way", "--"}, shellArgs(script)...)
 	exit, _, stderr := f.runApp(t, args...)
